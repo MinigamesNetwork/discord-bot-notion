@@ -97,7 +97,7 @@ async def poll_notion_database() -> None:
                 await channel.send(message)
             except Exception as e:
                 logger.error(f"Error sending message to Discord: {e}")
-        await asyncio.sleep(120)  # Poll every N seconds
+        await asyncio.sleep(30)  # Poll every N seconds
 
 
 @bot.event
