@@ -5,6 +5,7 @@ from datetime import datetime
 import logging
 from typing import List
 
+import discord
 from discord import Intents
 from discord.ext import commands
 from notion_client import Client
@@ -63,18 +64,6 @@ async def get_notion_pages() -> List[dict]:
         return []
 
 
-def format_page_message(page: dict) -> str:
-    """
-    Format the page title to be sent as a Discord message.
-
-    :param page: The Notion page.
-    :return: The formatted message.
-    """
-    title = page["properties"]["Name"]["title"][0]["text"]["content"]
-    message = f"**New Update:** {title}\n"
-    return message
-
-
 def find_card(database: list[dict], id_card: str):
     for page1 in database:
         if id_card == page1["id"]:
@@ -85,15 +74,21 @@ def find_card(database: list[dict], id_card: str):
 async def embed_new_card(card: dict):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        await channel.send("Создана карточка " + name_card(card))
+        await channel.send(embed=discord.Embed(title="Создана новая карточка",
+                                               description="`" + name_card(card) + "`",
+                                               color=65535
+                                               ))
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
 
-async def embed_change_card(card_name: str, card_param: str, old_value, new_value):
+async def embed_change_card(card_name: str, old_value, new_value):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        await channel.send("В карточке: "+card_name + " было "+ card_param + " " + old_value + " стало " + new_value)
+        await channel.send(embed=discord.Embed(title="Изменился статус: " + card_name,
+                                               description="Был: " + "`" + old_value + "`\n" + "Cтал: " + "`" + new_value + "`",
+                                               color=65535
+                                               ))
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
@@ -101,15 +96,32 @@ async def embed_change_card(card_name: str, card_param: str, old_value, new_valu
 async def embed_addperson(card_name: str, person_name: str):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        await channel.send("К карточке  "+card_name + " добавлен " + person_name)
+        await channel.send(embed=discord.Embed(title="Добавлен пользователь",
+                                               description="Карточка: " + "`" + card_name + "`" + "\n" + "Пользователь: " + "`" + person_name + "`",
+                                               color=65535
+                                               ))
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
 
-async def embed_delperson(card_name: str, person_name: str):
+async def embed_delete_person(card_name: str, person_name: str):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        await channel.send("В карточке  "+card_name + " удален " + person_name)
+        await channel.send(embed=discord.Embed(title="Удален пользователь",
+                                               description="Карточка: " + "`" + card_name + "`" + "\n" + "Пользователь: " + "`" + person_name + "`",
+                                               color=65535
+                                               ))
+    except Exception as e:
+        logger.error(f"Error sending message to Discord: {e}")
+
+
+async def embed_delete_card(card: dict):
+    channel = bot.get_channel(DISCORD_CHANNEL_ID)
+    try:
+        await channel.send(embed=discord.Embed(title="Удалена карточка",
+                                               description="`" + name_card(card) + "`",
+                                               color=65535
+                                               ))
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
@@ -139,7 +151,7 @@ async def poll_notion_database() -> None:
                 continue
 
             elif card["properties"]["Lifecycle"] != old_card["properties"]["Lifecycle"]:
-                await embed_change_card(name_card(card), "Статус", old_card["properties"]["Lifecycle"]["select"]["name"], card["properties"]["Lifecycle"]["select"]["name"])
+                await embed_change_card(name_card(card), old_card["properties"]["Lifecycle"]["select"]["name"], card["properties"]["Lifecycle"]["select"]["name"])
 
             elif card["properties"]["Assign"]["people"] != old_card["properties"]["Assign"]["people"]:
                 old_people = old_card["properties"]["Assign"]["people"]
@@ -153,7 +165,13 @@ async def poll_notion_database() -> None:
                 for person in old_people:
                     if person in new_people:
                         continue
-                    await embed_delperson(name_card(card), person["name"])
+                    await embed_delete_person(name_card(card), person["name"])
+
+        for card in old_pages:
+            new_card = find_card(new_pages, card["id"])
+            if new_card is None:
+                await embed_delete_card(card)
+
         old_pages = new_pages
         await asyncio.sleep(POLL_INTERVAL)  # Poll every N seconds
 
