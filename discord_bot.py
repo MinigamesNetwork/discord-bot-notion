@@ -1,3 +1,4 @@
+import json
 import os
 import asyncio
 import traceback
@@ -17,7 +18,7 @@ load_dotenv()
 # Retrieve values from environment variables
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 NOTION_API_KEY = os.getenv("NOTION_API_KEY")
-DATABASE_ID = os.getenv("DATABASE_ID")
+DATABASES_ID = json.loads(os.environ["DATABASE_ID"])
 DISCORD_CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", 120))
 LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
@@ -43,10 +44,16 @@ notion = Client(auth=NOTION_API_KEY)
 # Store the last checked timestamp
 last_checked = datetime.utcnow().replace(microsecond=0).isoformat()
 
-old_pages = None
+old_databases = None
 
 
-async def get_notion_pages() -> List[dict]:
+class Databases:
+    def __init__(self, name, pages):
+        self.name = name
+        self.pages = pages
+
+
+async def get_notion_pages(database_id: str) -> List[dict]:
     """
     Fetch pages from the Notion database since the last checked timestamp.
 
@@ -54,10 +61,11 @@ async def get_notion_pages() -> List[dict]:
     """
     global last_checked
     try:
-        pages = notion.databases.query(**{"database_id": DATABASE_ID}).get("results")
+        pages = notion.databases.query(**{"database_id": database_id}).get("results")
         last_checked = datetime.utcnow().replace(microsecond=0).isoformat()
         logger.info(f"Last checked at: {last_checked}")
         logger.debug(pages)
+        await asyncio.sleep(1)
         return pages
     except Exception as e:
         logger.error(f"Error fetching pages from Notion: {e}")
@@ -71,57 +79,88 @@ def find_card(database: list[dict], id_card: str):
     return None
 
 
-async def embed_new_card(card: dict):
+def find_persons(people):
+    persons = "не выбрано"
+    for person in people:
+        if persons == "не выбрано":
+            persons = ""
+            persons += str(person["name"])
+        else:
+            persons += ", " + str(person["name"])
+    return persons
+
+
+async def embed_new_card(card: dict, name_database):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        await channel.send(embed=discord.Embed(title="Создана новая карточка",
-                                               description="`" + name_card(card) + "`",
-                                               color=65535
-                                               ))
+        params = ["Название: " + "`" + name_card(card) + "`", "Пользователь(-ли): " + "`" + find_persons(card["properties"]["Assign"]["people"]) + "`"]
+
+        if find_status(card["properties"]) is not None:
+            params.append("Статус выполнения:" + find_status(card["properties"]))
+
+        embed = discord.Embed(title="Создана новая карточка",
+                              description="\n".join(params),
+                              color=int("02b564", 16))
+
+        embed.set_footer(text="База данных: " + name_database)
+
+        await channel.send(embed=embed)
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
 
-async def embed_change_card(card_name: str, old_value, new_value):
+async def embed_change_card(card_name: str, old_value, new_value, name_database, card):  # Можно было не передавать карту, потом пофикшу
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        await channel.send(embed=discord.Embed(title="Изменился статус: " + card_name,
-                                               description="Был: " + "`" + old_value + "`\n" + "Cтал: " + "`" + new_value + "`",
-                                               color=65535
-                                               ))
+        embed = discord.Embed(title="Изменился статус: " + card_name,
+                              description="Был: " + "`" + old_value + "`\nCтал: `" + new_value + "`\nПользователь(-ли): `" + find_persons(card["properties"]["Assign"]["people"]) + "`",
+                              color=int("eb6d22", 16))
+
+        embed.set_footer(text="База данных: " + name_database)
+
+        await channel.send(embed=embed)
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
 
-async def embed_addperson(card_name: str, person_name: str):
+async def embed_add_person(card_name: str, person_name: str, name_database):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        await channel.send(embed=discord.Embed(title="Добавлен пользователь",
-                                               description="Карточка: " + "`" + card_name + "`" + "\n" + "Пользователь: " + "`" + person_name + "`",
-                                               color=65535
-                                               ))
+        embed = discord.Embed(title="Добавлен пользователь",
+                              description="Карточка: " + "`" + card_name + "`" + "\n" + "Пользователь: " + "`" + person_name + "`",
+                              color=int("02b564", 16))
+
+        embed.set_footer(text="База данных: " + name_database)
+
+        await channel.send(embed=embed)
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
 
-async def embed_delete_person(card_name: str, person_name: str):
+async def embed_delete_person(card_name: str, person_name: str, name_database):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        await channel.send(embed=discord.Embed(title="Удален пользователь",
-                                               description="Карточка: " + "`" + card_name + "`" + "\n" + "Пользователь: " + "`" + person_name + "`",
-                                               color=65535
-                                               ))
+        embed = discord.Embed(title="Удален пользователь",
+                              description="Карточка: " + "`" + card_name + "`" + "\n" + "Пользователь: " + "`" + person_name + "`",
+                              color=int("aa2012", 16))
+
+        embed.set_footer(text="База данных: " + name_database)
+
+        await channel.send(embed=embed)
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
 
-async def embed_delete_card(card: dict):
+async def embed_delete_card(card: dict, name_database):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        await channel.send(embed=discord.Embed(title="Удалена карточка",
-                                               description="`" + name_card(card) + "`",
-                                               color=65535
-                                               ))
+        embed = discord.Embed(title="Удалена карточка",
+                              description="`" + name_card(card) + "`",
+                              color=int("aa2012", 16))
+
+        embed.set_footer(text="База данных: " + name_database)
+
+        await channel.send(embed=embed)
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
@@ -133,46 +172,76 @@ def name_card(card: dict):
     return title[0]["text"]["content"]
 
 
+def find_old_page(name):
+    global old_databases
+    for element in old_databases:
+        if element.name == name:
+            return element.pages
+    return None
+
+
+def find_status(properties: dict):
+    for key in properties.keys():
+        if key == "Lifecycle":
+            if properties["Lifecycle"]["select"] is not None:
+                return properties["Lifecycle"]["select"]["name"]
+            else:
+                return None
+        elif key == "Status":
+            return properties["Status"]["status"]["name"]
+    return None
+
+
 async def poll_notion_database() -> None:
     """
     Poll the Notion database and send updates to a Discord channel.
     """
-    global old_pages
+    global old_databases
     while True:
-        new_pages = await get_notion_pages()
-        if old_pages is None:
-            old_pages = new_pages
+        new_databases = []
+        databases_keys = DATABASES_ID.keys()
+        for database_name in databases_keys:
+            page = await get_notion_pages(DATABASES_ID[database_name])
+            new_databases.append(Databases(database_name, page))
+
+        if old_databases is None:
+            old_databases = new_databases
             continue
 
-        for card in new_pages:
-            old_card = find_card(old_pages, card["id"])
-            if old_card is None:
-                await embed_new_card(card)
-                continue
+        for database in new_databases:
+            new_pages = database.pages
+            old_pages = find_old_page(database.name)
 
-            elif card["properties"]["Lifecycle"] != old_card["properties"]["Lifecycle"]:
-                await embed_change_card(name_card(card), old_card["properties"]["Lifecycle"]["select"]["name"], card["properties"]["Lifecycle"]["select"]["name"])
+            for card in new_pages:
+                old_card = find_card(old_pages, card["id"])
+                if old_card is None:
+                    await embed_new_card(card, database.name)
+                    continue
 
-            elif card["properties"]["Assign"]["people"] != old_card["properties"]["Assign"]["people"]:
-                old_people = old_card["properties"]["Assign"]["people"]
-                new_people = card["properties"]["Assign"]["people"]
+                elif find_status(card["properties"]) != find_status(old_card["properties"]) and find_status(card["properties"]) is not None:
+                    await embed_change_card(name_card(card), find_status(old_card["properties"]),
+                                            find_status(card["properties"]), database.name, card)
 
-                for person in new_people:
-                    if person in old_people:
-                        continue
-                    await embed_addperson(name_card(card), person["name"])
+                elif card["properties"]["Assign"]["people"] != old_card["properties"]["Assign"]["people"]:
+                    old_people = old_card["properties"]["Assign"]["people"]
+                    new_people = card["properties"]["Assign"]["people"]
 
-                for person in old_people:
-                    if person in new_people:
-                        continue
-                    await embed_delete_person(name_card(card), person["name"])
+                    for person in new_people:
+                        if person in old_people:
+                            continue
+                        await embed_add_person(name_card(card), person["name"], database.name)
 
-        for card in old_pages:
-            new_card = find_card(new_pages, card["id"])
-            if new_card is None:
-                await embed_delete_card(card)
+                    for person in old_people:
+                        if person in new_people:
+                            continue
+                        await embed_delete_person(name_card(card), person["name"], database.name)
 
-        old_pages = new_pages
+            for card in old_pages:
+                new_card = find_card(new_pages, card["id"])
+                if new_card is None:
+                    await embed_delete_card(card, database.name)
+
+        old_databases = new_databases
         await asyncio.sleep(POLL_INTERVAL)  # Poll every N seconds
 
 
