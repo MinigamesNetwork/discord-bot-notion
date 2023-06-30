@@ -93,58 +93,73 @@ def find_persons(people):
 async def embed_new_card(card: dict, name_database):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        params = ["Название: " + "`" + name_card(card) + "`", "Пользователь(-ли): " + "`" + find_persons(card["properties"]["Assign"]["people"]) + "`"]
-
+        status = "Не найден"
         if find_status(card["properties"]) is not None:
-            params.append("Статус выполнения:" + find_status(card["properties"]))
+            status = find_status(card["properties"])
 
-        embed = discord.Embed(title="Создана новая карточка",
-                              description="\n".join(params),
+        embed = discord.Embed(title="[" + name_database + "] " + name_card(card),
                               color=int("02b564", 16))
 
-        embed.set_footer(text="База данных: " + name_database)
+        embed.set_author(name="Создана новая карточка:")
+        embed.add_field(name=" ", value=" ", inline=False)
+        embed.add_field(name="Пользователь(-ли):\u200b", value=find_persons(card["properties"]["Assign"]["people"]), inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="Статус выполнения:\u200b", value=status, inline=True)
+        embed.set_footer(text="Minecraft Network  |  " + datetime.today().strftime('%d %b %Y  %H:%M'))
 
         await channel.send(embed=embed)
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
 
-async def embed_change_card(card_name: str, old_value, new_value, name_database, card):  # Можно было не передавать карту, потом пофикшу
+async def embed_change_card(card_name: str, old_value, new_value, name_database):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        embed = discord.Embed(title="Изменился статус: " + card_name,
-                              description="Был: " + "`" + old_value + "`\nCтал: `" + new_value + "`\nПользователь(-ли): `" + find_persons(card["properties"]["Assign"]["people"]) + "`",
+        embed = discord.Embed(title="[" + name_database + "] " + card_name,
                               color=int("eb6d22", 16))
 
-        embed.set_footer(text="База данных: " + name_database)
+        embed.set_author(name="Изменился статус:")
+        embed.add_field(name=" ", value=" ", inline=False)
+        embed.add_field(name="Прошлый статус:", value=old_value, inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="Новый статус:", value=new_value, inline=True)
+        embed.set_footer(text="Minecraft Network  |  " + datetime.today().strftime('%d %b %Y  %H:%M'))
 
         await channel.send(embed=embed)
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
 
-async def embed_add_person(card_name: str, person_name: str, name_database):
+async def embed_add_person(card_name: str, person_name: str, name_database, card):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        embed = discord.Embed(title="Добавлен пользователь",
-                              description="Карточка: " + "`" + card_name + "`" + "\n" + "Пользователь: " + "`" + person_name + "`",
+        embed = discord.Embed(title="[" + name_database + "] " + card_name,
                               color=int("02b564", 16))
 
-        embed.set_footer(text="База данных: " + name_database)
+        embed.set_author(name="Добавлен пользователь:")
+        embed.add_field(name=" ", value=" ", inline=False)
+        embed.add_field(name="Новый пользователь: ", value=person_name, inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="Все пользователи: ", value=find_persons(card["properties"]["Assign"]["people"]), inline=True)
+        embed.set_footer(text="Minecraft Network  |  " + datetime.today().strftime('%d %b %Y  %H:%M'))
 
         await channel.send(embed=embed)
     except Exception as e:
         logger.error(f"Error sending message to Discord: {e}")
 
 
-async def embed_delete_person(card_name: str, person_name: str, name_database):
+async def embed_delete_person(card_name: str, person_name: str, name_database, card):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        embed = discord.Embed(title="Удален пользователь",
-                              description="Карточка: " + "`" + card_name + "`" + "\n" + "Пользователь: " + "`" + person_name + "`",
+        embed = discord.Embed(title="[" + name_database + "] " + card_name,
                               color=int("aa2012", 16))
 
-        embed.set_footer(text="База данных: " + name_database)
+        embed.set_author(name="Удален пользователь:")
+        embed.add_field(name=" ", value=" ", inline=False)
+        embed.add_field(name="Удаленный пользователь: ", value=person_name, inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="Все пользователи: ", value=find_persons(card["properties"]["Assign"]["people"]), inline=True)
+        embed.set_footer(text="Minecraft Network  |  " + datetime.today().strftime('%d %b %Y  %H:%M'))
 
         await channel.send(embed=embed)
     except Exception as e:
@@ -154,11 +169,11 @@ async def embed_delete_person(card_name: str, person_name: str, name_database):
 async def embed_delete_card(card: dict, name_database):
     channel = bot.get_channel(DISCORD_CHANNEL_ID)
     try:
-        embed = discord.Embed(title="Удалена карточка",
-                              description="`" + name_card(card) + "`",
+        embed = discord.Embed(title="[" + name_database + "] " + name_card(card),
                               color=int("aa2012", 16))
 
-        embed.set_footer(text="База данных: " + name_database)
+        embed.set_author(name="Удалена карточка:")
+        embed.set_footer(text="Minecraft Network  |  " + datetime.today().strftime('%d %b %Y  %H:%M'))
 
         await channel.send(embed=embed)
     except Exception as e:
@@ -220,7 +235,7 @@ async def poll_notion_database() -> None:
 
                 elif find_status(card["properties"]) != find_status(old_card["properties"]) and find_status(card["properties"]) is not None:
                     await embed_change_card(name_card(card), find_status(old_card["properties"]),
-                                            find_status(card["properties"]), database.name, card)
+                                            find_status(card["properties"]), database.name)
 
                 elif card["properties"]["Assign"]["people"] != old_card["properties"]["Assign"]["people"]:
                     old_people = old_card["properties"]["Assign"]["people"]
@@ -229,12 +244,12 @@ async def poll_notion_database() -> None:
                     for person in new_people:
                         if person in old_people:
                             continue
-                        await embed_add_person(name_card(card), person["name"], database.name)
+                        await embed_add_person(name_card(card), person["name"], database.name, card)
 
                     for person in old_people:
                         if person in new_people:
                             continue
-                        await embed_delete_person(name_card(card), person["name"], database.name)
+                        await embed_delete_person(name_card(card), person["name"], database.name, card)
 
             for card in old_pages:
                 new_card = find_card(new_pages, card["id"])
