@@ -47,7 +47,7 @@ last_checked = datetime.utcnow().replace(microsecond=0).isoformat()
 #
 time_msg = (datetime.utcnow() + timedelta(hours=3)).strftime('%d.%m.%y  %H:%M')
 
-old_databases = None
+old_databases = []
 
 
 class Databases:
@@ -75,10 +75,14 @@ async def get_notion_pages(database_id: str) -> List[dict]:
         return []
 
 
-def find_card(database: list[dict], id_card: str):
-    for page1 in database:
-        if id_card == page1["id"]:
-            return page1
+def find_card(database: list[dict], card):
+    id_card = card["id"]
+    name = name_card(card)
+    for card_i in database:
+        if id_card == card_i["id"]:
+            return card_i
+        elif name == name_card(card_i):
+            return card_i
     return None
 
 
@@ -230,7 +234,7 @@ async def poll_notion_database() -> None:
             page = await get_notion_pages(DATABASES_ID[database_name])
             new_databases.append(Databases(database_name, page))
 
-        if old_databases is None:
+        if len(old_databases) == 0:
             old_databases = new_databases
             continue
 
@@ -239,7 +243,7 @@ async def poll_notion_database() -> None:
             old_pages = find_old_page(database.name)
 
             for card in new_pages:
-                old_card = find_card(old_pages, card["id"])
+                old_card = find_card(old_pages, card)
                 if old_card is None:
                     await embed_new_card(card, database.name)
                     continue
@@ -263,9 +267,9 @@ async def poll_notion_database() -> None:
                         await embed_delete_person(name_card(card), person["name"], database.name, card)
 
             for card in old_pages:
-                new_card = find_card(new_pages, card["id"])
+                new_card = find_card(new_pages, card)
                 if new_card is None:
-                    await embed_delete_card(card, database.name, find_card(old_pages, card["id"]))
+                    await embed_delete_card(card, database.name, find_card(old_pages, card))
 
         old_databases = new_databases
         await asyncio.sleep(POLL_INTERVAL)  # Poll every N seconds
