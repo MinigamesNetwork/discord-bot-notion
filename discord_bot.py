@@ -232,7 +232,14 @@ async def poll_notion_database() -> None:
         databases_keys = DATABASES_ID.keys()
         for database_name in databases_keys:
             page = await get_notion_pages(DATABASES_ID[database_name])
-            new_databases.append(Databases(database_name, page))
+            if len(page) != 0:
+                new_databases.append(Databases(database_name, page))
+            else:
+                break
+
+        if len(old_databases) != len(new_databases):
+            await asyncio.sleep(POLL_INTERVAL)
+            continue
 
         if len(old_databases) == 0:
             old_databases = new_databases
